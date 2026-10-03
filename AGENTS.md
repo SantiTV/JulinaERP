@@ -50,6 +50,9 @@ npm run db:migrate     # aplicar migraciones
 - **Tokens OAuth de ML:** el access token caduca (~6 h) y el refresh token es de un solo uso: al renovar hay que guardar el **nuevo** refresh token de forma atómica, o se pierde el acceso. Serializar las renovaciones (un solo refresh concurrente por cuenta). Verificar detalles vigentes en la documentación oficial.
 - `globalStock` no es la suma de `channelStock`: es el stock físico central; cada canal recibe una asignación. Definición exacta en `SPEC.md` §3.
 - `externalId` es obligatorio salvo en el canal `local`.
+- **Dry-run:** toda escritura hacia un canal externo pasa por el conector y debe respetar `DRY_RUN`. Nunca llamar directamente a una API de escritura de un canal. En dry-run la BD se revierte (`rollback`) y las acciones se registran en el informe (ver `SPEC.md` §8).
+- **`sku` = código de producto existente** (del Excel actual); no inventar ni regenerar SKUs.
+- La importación desde Excel está **diferida** (`SPEC.md` §10): no implementarla ni inventar el formato del archivo hasta que exista una muestra en `docs/samples/`.
 
 ## Forma de trabajar
 - **Planifica antes de codificar** cuando el cambio toque más de 2 archivos, el modelo de datos, la lógica de stock, OAuth o un conector. Usa el formato de plan de `PLAN.md`.
@@ -61,15 +64,16 @@ npm run db:migrate     # aplicar migraciones
 - ✅ Siempre: escribir o actualizar tests de cualquier cambio en lógica de stock.
 - ✅ Siempre: usar transacciones para cualquier escritura que afecte stock o tokens.
 - ✅ Siempre: validar con Zod toda entrada externa (HTTP y webhooks).
+- ✅ Siempre: probar con `DRY_RUN=true` antes de cualquier ejecución contra una cuenta real.
 - ✅ Siempre: actualizar `MEMORY.md` al terminar cada tarea.
 - ⚠️ Pregunta antes: añadir dependencias, crear archivos fuera de la estructura anterior, cambiar el esquema de la BD o el contrato de la API, o añadir un canal nuevo.
-- 🚫 Nunca: usar FastAPI o RAG; guardar claves o tokens en el repositorio o en logs; editar migraciones ya aplicadas; hacer llamadas a APIs reales de producción desde los tests; modificar `.env` real.
+- 🚫 Nunca: desactivar `DRY_RUN` en un entorno compartido o de producción sin que lo pida el dueño del proyecto; usar FastAPI o RAG; guardar claves o tokens en el repositorio o en logs; editar migraciones ya aplicadas; hacer llamadas a APIs reales de producción desde los tests; modificar `.env` real.
 
 ## Verificación
 Antes de dar una tarea por terminada, ejecutar y reportar el resultado de:
 1. `npm run typecheck && npm run lint`
 2. `npm test` (incluido un test de concurrencia si se tocó stock)
-3. Para webhooks/conectores: probar con payloads de ejemplo (fixtures), nunca contra producción.
+3. Para webhooks/conectores: probar con payloads de ejemplo (fixtures), nunca contra producción. Verificar con un test que en dry-run no sale ninguna escritura externa y la BD no cambia.
 4. Confirmar que los criterios de aceptación de la spec correspondiente se cumplen.
 
 ## Memoria
